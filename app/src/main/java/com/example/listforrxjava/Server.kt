@@ -9,13 +9,13 @@ import kotlin.collections.ArrayList
 import kotlin.random.Random
 
 
-class Server(dir: File, var countportioncontent : Int) : Serializable
+class Server(var countportioncontent : Int) : Serializable
 {
     //вместо сервера с возможностью удалением данных
-    private val filecontentdata : File = File(dir, "filecontentdata.bin")//бэкап сервера
+    //dir: File
+    //private val filecontentdata : File = File(dir, "filecontentdata.bin")//бэкап сервера
     private var contentArrList : ArrayList<Joke> = ArrayList()
     private val countforload : Int = 200 //сколько загружается из настоящего сервера
-    private var iscomplete : Boolean = false
     private var starindexnetcontent : Int = 0
     private var actualid : Int = 0
     val messagenullcount : String = "Data null. You remove all content or Internet disconnected"
@@ -77,32 +77,29 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
             var endindex : Int
             val substr1 = "\"joke\":"
             val substr2 = "\", \"categories\""
-            var line: StringBuffer? = StringBuffer(reader.readLine())
+            val line = StringBuffer(reader.readLine())
             var i : Int = 0
-            if (true)
+            Log.v("cycle", line.toString())
+            while (true)
             {
-                Log.v("cycle", line.toString())
-                while (true)
+                startindex = line.indexOf(substr1) + substr1.length
+                if (startindex - substr1.length == -1)
                 {
-                    startindex = line!!.indexOf(substr1) + substr1.length
-                    if (startindex - substr1.length == -1)
-                    {
-                        Log.v("cycle", "break")
-                        break;
-                    }
-                    endindex = line!!.indexOf(substr2)
-                    var resultstring : String = line!!.substring(startindex, endindex)
-                    while (resultstring.indexOf("\\") != -1)
-                    {
-                        Log.v("cycle", resultstring)
-                        resultstring = resultstring.replace("\\", "")
-                    }
-                    contentArrList.add(Joke(actualid++, resultstring))
-                    Log.v("swipee", "load i " + contentArrList.size.toString())
-
-                    line!!.delete(0, endindex + substr2.length)
-                    i++
+                    Log.v("cycle", "break")
+                    break;
                 }
+                endindex = line.indexOf(substr2)
+                var resultstring : String = line.substring(startindex, endindex)
+                while (resultstring.indexOf("\\") != -1)
+                {
+                    Log.v("cycle", resultstring)
+                    resultstring = resultstring.replace("\\", "")
+                }
+                contentArrList.add(Joke(actualid++, resultstring))
+                Log.v("swipee", "load i " + contentArrList.size.toString())
+
+                line.delete(0, endindex + substr2.length)
+                i++
             }
         }
         finally
@@ -114,9 +111,9 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
                 contentArrList.add(Joke(-1, messagenullcount))
             }
             Log.v("conee", getCountContent().toString())
-            if (reader != null) {reader.close()}
-            if (stream != null) {stream.close()}
-            if (connection != null) {connection.disconnect()}
+            reader?.close()
+            stream?.close()
+            connection?.disconnect()
             Log.v("conee", getCountContent().toString())
             returnContentList()
         }
@@ -141,7 +138,8 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
     private fun CreateDataFile()
     {
         try {
-            getContentFromTrueServer("http://api.icndb.com/jokes/random/${countforload.toString()}?escape=javascript")
+            getContentFromTrueServer(
+                "http://api.icndb.com/jokes/random/${countforload.toString()}?escape=javascript")
             Log.v("conee", "returnconetnt")
         }
         catch (e: IOException)
@@ -151,7 +149,7 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
     }
 
 
-//      решил убрать, но оставил вдруг пригодятся
+//      решил убрать за ненадобностью, но оставил вдруг пригодятся
 //    private fun saveDataFile()
 //    {
 //        try
