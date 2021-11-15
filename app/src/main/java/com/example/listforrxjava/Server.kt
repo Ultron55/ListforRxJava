@@ -119,7 +119,6 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
             if (connection != null) {connection.disconnect()}
             Log.v("conee", getCountContent().toString())
             returnContentList()
-            Log.v("conee", "returnconetnt")
         }
     }
 
@@ -129,12 +128,13 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
         var endindex = countportioncontent
         Log.v("lload", "cona size" + contentArrList.size.toString())
         if (endindex > getCountContent()) endindex = getCountContent()
-        for (j in starindexnetcontent until endindex)
+        if (getCountContent() != 1)
         {
-            arr.add(contentArrList[j])
+            for (j in starindexnetcontent until endindex)
+            {
+                arr.add(contentArrList[j])
+            }
         }
-        Log.v("lload", contentArrList[contentArrList.size - 1].getJokeText())
-        Log.v("lload", arr[arr.size - 1].getJokeText())
         ContentStream.onNext(arr) // раздача контента
     }
 
@@ -142,6 +142,7 @@ class Server(dir: File, var countportioncontent : Int) : Serializable
     {
         try {
             getContentFromTrueServer("http://api.icndb.com/jokes/random/${countforload.toString()}?escape=javascript")
+            Log.v("conee", "returnconetnt")
         }
         catch (e: IOException)
         {

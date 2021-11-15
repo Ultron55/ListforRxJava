@@ -18,6 +18,7 @@ import io.reactivex.disposables.Disposable
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.recyclerview_item.view.*
 import java.io.*
+import java.nio.file.Files.walk
 
 
 class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivity ()  {
@@ -80,21 +81,18 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
 
     fun setCacheFile()
     {
-        val s : File? = File(cacheDir.path).walk(FileWalkDirection.BOTTOM_UP)
-            .sortedBy{ it.isDirectory }.elementAt(0)
-        if (s != null)
+        val s = File(cacheDir.path).listFiles()
+        if (s!!.isNotEmpty())
         {
-            cachefile = s
+            Log.v("filem", "cacheexist")
+            cachefile = s[0]
         }
         else
         {
+            Log.v("filem", "s.pathnull")
             cachefile = File.createTempFile("saveInstancestatecache",
                 null, applicationContext.cacheDir)
         }
-        File(cacheDir.path).walk(FileWalkDirection.BOTTOM_UP)
-            .sortedBy{ it.isDirectory }.forEach {
-                if (!it.equals(cachefile)) it.delete()
-            }
     }
 
     override fun onSaveInstanceState(savedInstanceState: Bundle) {
@@ -109,6 +107,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         {
             //cache
             ObjectOutputStream(FileOutputStream(cachefile)).use { oos ->
+                Log.v("filecc", "cache" + contentArrList.size.toString())
                 oos.writeObject(contentArrList)
                 Log.v("filecc", "cache")
             }
@@ -138,6 +137,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
             try
             {
                 swiperefreshlayout.isRefreshing = true
+                Log.v("filemapopen", "readcache " + contentArrList.toString())
                 ObjectInputStream(FileInputStream(cachefile)).use { ois ->
                     contentArrList = ois.readObject() as ArrayList<Joke>
                     Log.v("filemapopen", "recycl " + contentArrList.toString())
@@ -270,10 +270,10 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
                     Thread.sleep(20)
                 }
                 s.dispose()
-                Log.v("setalll", "observable" + newcontentarrlist.size.toString())
                 observer = LoadALLObserver()
             }
             Log.v("setalll", "observable")
+            Log.v("setalll", "observable" + newcontentarrlist.size.toString())
             Observable.just(newcontentarrlist)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(observer)
@@ -288,16 +288,20 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
                 Log.v("loaders", "loaderall")
                 Log.v("swipee", "ns" + newcontentarrlist.size.toString())
                 Log.v("swipee", "co" + contentArrList.toString())
-                recyclerViewAdapter.setAllItem()
-                contentArrList.clear()
-                for (j in newcontentarrlist)
+                if (newcontentarrlist.size > 0)
                 {
-                    contentArrList.add(j)
+                    recyclerViewAdapter.setAllItem()
+                    contentArrList.clear()
+                    for (j in newcontentarrlist)
+                    {
+                        contentArrList.add(j)
+                    }
+                    Log.v("swipee", contentArrList.size.toString())
+                    Log.v("swipee", "cos")
+                    Toast.makeText(applicationContext, "Data uploaded", Toast.LENGTH_SHORT).show()
                 }
-                Log.v("swipee", contentArrList.size.toString())
-                Log.v("swipee", "cos")
                 swiperefreshlayout.isRefreshing = false
-                Toast.makeText(applicationContext, "Data uploaded", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, "Data don't uploaded", Toast.LENGTH_SHORT).show()
             }
             override fun onSubscribe(s: Disposable) {}
             override fun onError(e: Throwable) {Log.v("lloadmore", e.message.toString())}
@@ -312,12 +316,15 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
                 Log.v("lloadmore", newcontentarrlist.size.toString())
                 Log.v("loaders", "loadermore")
                 Log.v("lloadmore", "onload4" + Thread.currentThread().name)
-                infiniteScrollListener.loading = false
                 Log.v("lloadmore", "A"  + contentArrList.size.toString())
+                infiniteScrollListener.loading = false
                 recyclerViewAdapter.removeLoader()
-                for (i in 0 until portioncount)
+                if (newcontentarrlist.size > 0)
                 {
-                    contentArrList.add(newcontentarrlist[i])
+                    for (i in 0 until portioncount)
+                    {
+                        contentArrList.add(newcontentarrlist[i])
+                    }
                 }
                 Log.v("lloadmore", "A"  + contentArrList.size.toString())
                 Log.v("lloadmore", "onload4" + recyclerViewAdapter.itemCount.toString())
