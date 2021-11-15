@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ListforRxJava</string>
+    <string name="deletebtn">Delete</string>
+    <string name="swipetext">Swipe Down to Refresh  \\/</string>
+</resources>
