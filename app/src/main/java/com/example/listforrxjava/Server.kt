@@ -15,14 +15,14 @@ class Server(var countportioncontent : Int) : Serializable
     //dir: File
     //private val filecontentdata : File = File(dir, "filecontentdata.bin")//бэкап сервера
     private var contentArrList : ArrayList<Joke> = ArrayList()
-    private val countforload : Int = 200 //сколько загружается из настоящего сервера
+    private val LOADSLIMIT : Int = 200 //сколько загружается из настоящего сервера
     private var starindexnetcontent : Int = 0
     private var actualid : Int = 0
     val messagenullcount : String = "Data null. You remove all content or Internet disconnected"
     @Transient public val ContentStream: PublishSubject<ArrayList<Joke>> = PublishSubject.create()
 
     //Загрузка в мой сервер из настоящего
-    public fun LoadNew(count: Int)
+    public fun Reload(count: Int)
     {
         countportioncontent = count
         starindexnetcontent = 0
@@ -34,7 +34,7 @@ class Server(var countportioncontent : Int) : Serializable
     }
 
     //загрузка следующей порции из этого сервера
-    public fun getNextContentArrayList(count : Int) : ArrayList<Joke>
+    public fun getMoreContentArrayList(count : Int) : ArrayList<Joke>
     {
         countportioncontent = count
         Log.v("loaders", "getcontent")
@@ -105,11 +105,11 @@ class Server(var countportioncontent : Int) : Serializable
         finally
         {
             Log.v("conee", "finally")
-            if (contentArrList.size == 0)
-            {
-                Log.v("conee", "0s")
-                contentArrList.add(Joke(-1, messagenullcount))
-            }
+//            if (contentArrList.size == 0)
+//            {
+//                Log.v("conee", "0s")
+//                contentArrList.add(Joke(-1, messagenullcount))
+//            }
             Log.v("conee", getCountContent().toString())
             reader?.close()
             stream?.close()
@@ -139,7 +139,7 @@ class Server(var countportioncontent : Int) : Serializable
     {
         try {
             getContentFromTrueServer(
-                "http://api.icndb.com/jokes/random/${countforload.toString()}?escape=javascript")
+                "http://api.icndb.com/jokes/random/${LOADSLIMIT.toString()}?escape=javascript")
             Log.v("conee", "returnconetnt")
         }
         catch (e: IOException)

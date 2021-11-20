@@ -26,7 +26,6 @@ class InfiniteScrollListener (val linearLayoutManager: LinearLayoutManager,
             //последний элемент - догружаем
             Log.v("swipeee", "lllllload")
             listener?.onLoadMore()
-            loading = true
         }
     }
 

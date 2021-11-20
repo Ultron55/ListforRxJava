@@ -4,28 +4,29 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.get
+import androidx.core.view.iterator
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.floatingactionbutton.FloatingActionButton
-import io.reactivex.Observable
-import io.reactivex.Observer
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.Disposable
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.recyclerview_item.view.*
 import java.io.*
-import java.nio.file.Files.walk
 
 
 class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivity ()  {
 
     var recyclerView : RecyclerView? = null
-    private val portioncount = 20 // количество контента в порции
-    lateinit var server : Server
+    //private val PORTIONCOUNT = 20 // количество контента в порции
+    val viewModelServerOperations : ViewModelServerOperations by viewModels()
+    lateinit var LoadMoreSubscribe : Disposable
     lateinit var infiniteScrollListener : InfiniteScrollListener //для ловли прокрутки
     lateinit var recyclerViewAdapter: RecyclerViewAdapter
     private var contentArrList : ArrayList<Joke> = ArrayList() //контент
@@ -39,11 +40,13 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
     {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        Log.v("OnCreate", "start")
         issavedinstancestate = savedInstanceState != null
         recyclerView = findViewById(R.id.recyclerview)
         val manager = LinearLayoutManager(this)
+        swiperefreshlayout.isRefreshing = viewModelServerOperations.isRefreshing
         infiniteScrollListener = InfiniteScrollListener(manager, this)
-        infiniteScrollListener.loading = false
+        infiniteScrollListener.loading = viewModelServerOperations.isloadingmore
         recyclerView!!.layoutManager = manager
         recyclerView!!.addItemDecoration(
             DividerItemDecoration(this, DividerItemDecoration.VERTICAL)
@@ -51,9 +54,34 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         val selectcolor = ContextCompat.getColor(applicationContext, R.color.select)
         val textbackcolor = ContextCompat.getColor(applicationContext, R.color.textback)
         setCacheFile()
-        Restore(savedInstanceState)
+        var b = false
+        val n = viewModelServerOperations.isContentEmplty()
+        Log.v("viewmodel", "n$n")
+        if (n == 0)
+        {
+            viewModelServerOperations.ReloadContent()
+            val s =
+                viewModelServerOperations.ReloadDone.subscribe { arrlist ->
+                    b = true
+                    contentArrList = viewModelServerOperations.getContentArrList()
+                }
+            while (!b)
+            {
+                Thread.sleep(20)
+                Log.v("ViewModelget", b.toString())
+            }
+            s.dispose()
+            Log.v("ViewModelget", "no")
+        }
+        else
+        {
+            Log.v("ViewModelget", "yes")
+            contentArrList = viewModelServerOperations.getContentArrList()
+        }
         recyclerViewAdapter = RecyclerViewAdapter(contentArrList, textbackcolor, selectcolor)
         recyclerView!!.adapter = recyclerViewAdapter
+        var l = contentArrList.indexOf(recyclerViewAdapter.loaderval)
+        Log.v("loadobservnloader", l.toString())
         recyclerView!!.addOnScrollListener(infiniteScrollListener)
         if (issavedinstancestate)
         {
@@ -68,13 +96,79 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         }
         longClickSubscribe  = recyclerViewAdapter.itemClickStream.subscribe { v-> SelectItem(v)}
         val swipeRefreshLayout = findViewById<SwipeRefreshLayout>(R.id.swiperefreshlayout)
-        swipeRefreshLayout.setOnRefreshListener {
-            Log.v("swipee", ::server.isInitialized.toString())
-            selectlist.clear()
-            Log.v("swipee", Thread.currentThread().name)
-            LoadObservable(false)
+        swipeRefreshLayout.setOnRefreshListener {SwipeReload()}
+        LoadMore()
+        l = recyclerViewAdapter.getValues().indexOf(recyclerViewAdapter.loaderval)
+        Log.v("loadobservnloaderr", l.toString())
+
+    }
+
+    fun SwipeReload()
+    {
+        viewModelServerOperations.isRefreshing = true
+        selectlist.clear()
+        Log.v("swipee", Thread.currentThread().name)
+        viewModelServerOperations.ReloadContent()
+        var b = false
+        val s = viewModelServerOperations.ReloadDone.observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ arrlist ->
+                if (arrlist.isEmpty())
+                {
+                    Toast.makeText(
+                        applicationContext,
+                        "Data don't uploaded", Toast.LENGTH_SHORT
+                    ).show()
+                }
+                else
+                {
+                    recyclerView!!.scrollToPosition(0)
+                    recyclerViewAdapter.setAllItem()
+                }
+                b = true
+                viewModelServerOperations.isRefreshing = false
+                swiperefreshlayout.isRefreshing = false
+            })
+            {throwable -> Log.v("reloaddone", throwable.message.toString())}
+        Thread {
+            while (!b) Thread.sleep(20)
+            s.dispose()
+        }.start()
+    }
+
+    override fun onLoadMore() {
+        if (viewModelServerOperations.isRefreshing)
+        {
+            infiniteScrollListener.loading = false
+            viewModelServerOperations.isloadingmore = false
+            Log.v("loadobservn", "nooload")
+            return
         }
-        Thread {swiperefreshlayout.post { swiperefreshlayout.isRefreshing = true }}.start()
+        infiniteScrollListener.loading = true
+        Log.v("lloadmore", viewModelServerOperations.isContentEmplty().toString())
+        Log.v("lloadmore", contentArrList.toString())
+        Log.v("lloadmore", "onload")
+        recyclerView!!.post {recyclerViewAdapter.addLoader()}
+        viewModelServerOperations.LoadMoreContent()
+    }
+
+    fun LoadMore()
+    {
+        LoadMoreSubscribe = viewModelServerOperations.LoadMoreDone.observeOn(AndroidSchedulers.mainThread())
+            .subscribe({ arrlist ->
+                if (!viewModelServerOperations.isloadingmore) return@subscribe
+                if (arrlist.isEmpty())
+                {
+                    Toast.makeText(
+                        applicationContext,
+                        "Data don't uploaded", Toast.LENGTH_SHORT
+                    ).show()
+                }
+                Log.v("loadobserv", "recyclecoutn${recyclerViewAdapter.itemCount}")
+                infiniteScrollListener.loading = false
+                viewModelServerOperations.isloadingmore = false
+            })
+            {throwable -> Log.v("reloaddone", throwable.message.toString())}
+        Log.v("lloadmore", "onload2")
     }
 
     override fun onStart() {
@@ -91,6 +185,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
     override fun onDestroy() {
         if (::longClickSubscribe.isInitialized) longClickSubscribe.dispose()
         if (::errorDeleteSubscribe.isInitialized) errorDeleteSubscribe.dispose()
+        if (::LoadMoreSubscribe.isInitialized) LoadMoreSubscribe.dispose()
         super.onDestroy()
     }
 
@@ -105,181 +200,11 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         else
         {
             Log.v("filem", "s.cachenull")
-            cachefile = File.createTempFile("cachejokesarrlist",
-                null, applicationContext.cacheDir)
+            cachefile = File.createTempFile(
+                "cachejokesarrlist",
+                null, applicationContext.cacheDir
+            )
         }
-    }
-
-    override fun onSaveInstanceState(savedInstanceState: Bundle) {
-        Log.v("onsavedata", "adapter")
-        savedInstanceState.putSerializable("adapter", recyclerViewAdapter)
-        Log.v("onsavedata", "server")
-        savedInstanceState.putSerializable("server", server)
-        Log.v("onsavedata", "select")
-        savedInstanceState.putIntegerArrayList("selectlist", selectlist)
-        try
-        {
-            //cache
-            ObjectOutputStream(FileOutputStream(cachefile)).use { oos ->
-                Log.v("filecachesave", "cache" + contentArrList.size.toString())
-                oos.writeObject(contentArrList)
-                Log.v("filecachesave", "cache")
-            }
-        }
-        catch (ex: IOException)
-        {
-            Log.v("filecachesaveerror", ex.message.toString())
-        }
-        super.onSaveInstanceState(savedInstanceState)
-    }
-
-    fun Restore(savedInstanceState: Bundle?)
-    {
-        if (savedInstanceState != null)
-        {
-            //для поворотов экрана
-            Log.v("filemapopen", "bundle")
-            recyclerViewAdapter = savedInstanceState.getSerializable("adapter") as RecyclerViewAdapter
-            selectlist  =  savedInstanceState.getIntegerArrayList("selectlist") as ArrayList<Int>
-            server =  savedInstanceState.getSerializable("server") as Server
-            contentArrList = recyclerViewAdapter.getValues()
-
-        }
-        else if (cachefile.exists() && cachefile.length() > 200)
-        {
-            //для кэша при открытии
-            server = Server(portioncount)
-            try
-            {
-                swiperefreshlayout.isRefreshing = true
-                Log.v("filemapopen", "readcache " + contentArrList.toString())
-                ObjectInputStream(FileInputStream(cachefile)).use { ois ->
-                    contentArrList = ois.readObject() as ArrayList<Joke>
-                    Log.v("filemapopen", "contsize " + contentArrList.toString())
-                }
-                LoadObservable(false)
-            }
-            catch (ex: IOException)
-            {
-                Log.v("filemapopenerror", "error " + ex.message.toString())
-            }
-        }
-        else
-        {
-            // с чистого листв
-//            swiperefreshlayout.isRefreshing = true
-            server = Server(portioncount)
-            Log.v("elsse", "elsee")
-            Log.v("elsse", Thread.currentThread().name)
-            contentArrList.add(Joke(-1, "CHUCKING JOKES LOADING"))
-            LoadObservable(false)
-        }
-    }
-
-    private fun LoadObservable(isnextcontent : Boolean)
-    {
-        Thread {
-            var newcontentarrlist : ArrayList<Joke> = ArrayList()
-            val observer: Observer<ArrayList<Joke>>
-            if (isnextcontent)
-            {
-                newcontentarrlist = server.getNextContentArrayList(portioncount)
-                observer = LoadMoreObserver()
-            }
-            else
-            {
-                server.LoadNew(portioncount)
-                var b : Boolean = false
-                val s = server.ContentStream.subscribe { v->
-                    b = true
-                    newcontentarrlist.clear()
-                    for (j in v)
-                    {
-                        newcontentarrlist.add(j)
-                    }
-                }
-                while (!b)
-                {
-                    Thread.sleep(20)
-                }
-                s.dispose()
-                observer = LoadALLObserver()
-            }
-            Log.v("loadobserv", "observable" + newcontentarrlist.size.toString())
-            Observable.just(newcontentarrlist)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(observer)
-        }.start()
-
-    }
-
-    private fun LoadALLObserver(): Observer<ArrayList<Joke>> {
-        val observer : Observer<ArrayList<Joke>> = object :Observer<ArrayList<Joke>> {
-            override fun onNext(newcontentarrlist: ArrayList<Joke>) {
-                Log.v("swipee", "observer")
-                Log.v("loaders", "loaderall")
-                Log.v("swipee", "ns" + newcontentarrlist.size.toString())
-                Log.v("swipee", "co" + contentArrList.toString())
-                if (newcontentarrlist.isNotEmpty())
-                {
-                    recyclerViewAdapter.setAllItem()
-                    contentArrList.clear()
-                    for (j in newcontentarrlist)
-                    {
-                        contentArrList.add(j)
-                    }
-                    Log.v("swipee", contentArrList.size.toString())
-                    Toast.makeText(applicationContext, "Data uploaded", Toast.LENGTH_SHORT).show()
-                }
-                else
-                {
-                    Toast.makeText(applicationContext, "Data don't uploaded", Toast.LENGTH_SHORT).show()
-                }
-                swiperefreshlayout.isRefreshing = false
-            }
-            override fun onSubscribe(s: Disposable) {}
-            override fun onError(e: Throwable) {Log.v("lloadmore", e.message.toString())}
-            override fun onComplete() {}
-        }
-        return observer
-    }
-
-    private fun LoadMoreObserver(): Observer<ArrayList<Joke>> {
-        val observer : Observer<ArrayList<Joke>> = object :Observer<ArrayList<Joke>> {
-            override fun onNext(newcontentarrlist: ArrayList<Joke>) {
-                Log.v("lloadmore", newcontentarrlist.size.toString())
-                Log.v("loaders", "loadermore")
-                Log.v("lloadmore", "onload4" + Thread.currentThread().name)
-                Log.v("lloadmore", "A"  + contentArrList.size.toString())
-                recyclerViewAdapter.removeLoader()
-                if (newcontentarrlist.isNotEmpty())
-                {
-                    for (i in 0 until portioncount)
-                    {
-                        contentArrList.add(newcontentarrlist[i])
-                    }
-                }
-                infiniteScrollListener.loading = false
-                Log.v("lloadmore", "A"  + contentArrList.size.toString())
-                Log.v("lloadmore", "onload4" + recyclerViewAdapter.itemCount.toString())
-            }
-            override fun onComplete() {}
-            override fun onError(e: Throwable) {Log.v("lloadmore", e.message.toString())}
-            override fun onSubscribe(s: Disposable) {}
-        }
-        return observer
-    }
-
-    override fun onLoadMore() {
-        Log.v("lloadmore", "onload")
-        if (server.getCountContent() == contentArrList.size)
-        {
-            Log.v("lloadmore", server.getCountContent().toString())
-            return
-        }
-        recyclerViewAdapter.addLoader()
-        LoadObservable(true)
-        Log.v("lloadmore", "onload2")
     }
 
     fun SelectItem(v: View)
@@ -289,15 +214,13 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         Log.v("selectt", Thread.currentThread().name)
         when (tag)
         {
-            in selectlist ->
-            {
+            in selectlist -> {
                 recyclerViewAdapter.UnselectItem(tag)
                 Log.v("setselist", "del $tag")
                 Log.v("setselist", "del " + recyclerView!!.indexOfChild(v).toString())
                 selectlist.remove(tag)
             }
-            !in selectlist ->
-            {
+            !in selectlist -> {
                 recyclerViewAdapter.SelectItem(tag)
                 Log.v("setselist", "add $tag")
                 selectlist.add(tag)
@@ -313,7 +236,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         }
     }
 
-    public fun Deleteitem(v : View)
+    public fun Deleteitem(v: View)
     {
         // Для удаления
         Log.v("onclickl", "delete")
@@ -340,9 +263,9 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         Log.v("deleteitema", "BS" + backupcontentArrList.size.toString())
         selectlist.clear()
         floatingdeletebtn.hide()
-        server.DeleteContent(backupcontentArrList) //удаление с сервера
+        //server.DeleteContent(backupcontentArrList) //удаление с сервера
         backupcontentArrList.clear() // освобождаю память
-        errorDeleteSubscribe = server.errorDelete.subscribe {
+        /*errorDeleteSubscribe = server.errorDelete.subscribe {
                 arr ->
             for (k in 0 until arr.size)
             {
@@ -351,7 +274,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
                 Log.v("deleteitema", "ca.size" + contentArrList.size.toString())
             }
             errorDeleteSubscribe.dispose()
-        }
+        }*/
         // не слишком ли мало осталось
         val manager = LinearLayoutManager(this)
         if (manager.findLastVisibleItemPosition() == manager.itemCount - 1)

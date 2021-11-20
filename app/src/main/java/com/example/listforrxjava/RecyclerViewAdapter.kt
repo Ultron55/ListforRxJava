@@ -26,12 +26,13 @@ class RecyclerViewAdapter(
 
     override fun getItemViewType(position : Int) : Int
     {
-        return if (values[position] != loaderval) {CONTENT_TYPE}
+        return if (values[position].getId() != loaderval.getId()) {CONTENT_TYPE}
         else {PROGRESSTYPE}
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         var itemView : View
+        Log.v("loadobserv", "ccreate")
         if (viewType == CONTENT_TYPE)
         {
             itemView = LayoutInflater.from(parent.context).inflate(
@@ -61,7 +62,7 @@ class RecyclerViewAdapter(
         {
             holder.textview?.text =  values[position].getJokeText()
             holder.textview?.setTag(values[position].getId())
-            Log.v("eree", " selectindexes.setid")
+            Log.v("eree", " selectindexes$position")
         }
         Log.v("selectbind", " selectindexes.setid")
         // для выделения
@@ -156,10 +157,20 @@ class RecyclerViewAdapter(
     public fun removeLoader()
     {
         Log.v("lload", "remove")
-        Log.v("lload", itemCount.toString())
-        values.removeAt(itemCount - 1)
-        notifyItemRemoved(itemCount)
-        Log.v("lload", itemCount.toString())
+        var b = false
+        while (!b)
+        {
+            for (i in 0 until itemCount)
+            {
+                if (values[i].getId() == loaderval.getId())
+                {
+                    values.removeAt(i)
+                    notifyItemRemoved(i)
+                    break
+                }
+            }
+            b = true
+        }
     }
 
     @Transient public val itemClickStream: PublishSubject<View> = PublishSubject.create()
