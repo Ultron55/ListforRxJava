@@ -8,7 +8,7 @@ class ViewModelServerOperations() : ViewModel()
 {
     val PORTIONCOUNT : Int = 20
     var server : Server = Server(PORTIONCOUNT)
-    private var contentArrList : ArrayList<Joke> = ArrayList() //контент
+    private var contentArrList : ArrayList<Joke> = ArrayList()
     var selectlist : ArrayList<Int> = ArrayList() //индексы выделенных
     @Transient public val ReloadDone : PublishSubject<ArrayList<Joke>> =
         PublishSubject.create()
@@ -38,13 +38,13 @@ class ViewModelServerOperations() : ViewModel()
 
     public fun getContentArrList() : ArrayList<Joke>
     {
-        return contentArrList
+        return ArrayList(contentArrList)
     }
 
-    public fun AddLoader(j : Joke)
-    {
-        contentArrList.add(j)
-    }
+//    public fun AddLoader(j : Joke)
+//    {
+//        contentArrList.add(j)
+//    }
 
     public fun isContentEmplty() : Int
     {

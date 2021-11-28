@@ -7,8 +7,6 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.view.get
-import androidx.core.view.iterator
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -41,6 +39,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         Log.v("OnCreate", "start")
+//        MobileAds.initialize(this) {}
         issavedinstancestate = savedInstanceState != null
         recyclerView = findViewById(R.id.recyclerview)
         val manager = LinearLayoutManager(this)
@@ -61,7 +60,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         {
             viewModelServerOperations.ReloadContent()
             val s =
-                viewModelServerOperations.ReloadDone.subscribe { arrlist ->
+                viewModelServerOperations.ReloadDone.subscribe { newcontentarrlist ->
                     b = true
                     contentArrList = viewModelServerOperations.getContentArrList()
                 }
@@ -100,7 +99,6 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         LoadMore()
         l = recyclerViewAdapter.getValues().indexOf(recyclerViewAdapter.loaderval)
         Log.v("loadobservnloaderr", l.toString())
-
     }
 
     fun SwipeReload()
@@ -111,8 +109,8 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         viewModelServerOperations.ReloadContent()
         var b = false
         val s = viewModelServerOperations.ReloadDone.observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ arrlist ->
-                if (arrlist.isEmpty())
+            .subscribe({ newcontentarrlist ->
+                if (newcontentarrlist.isEmpty())
                 {
                     Toast.makeText(
                         applicationContext,
@@ -123,6 +121,8 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
                 {
                     recyclerView!!.scrollToPosition(0)
                     recyclerViewAdapter.setAllItem()
+                    contentArrList.clear()
+                    contentArrList.addAll(newcontentarrlist)
                 }
                 b = true
                 viewModelServerOperations.isRefreshing = false
@@ -154,16 +154,22 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
     fun LoadMore()
     {
         LoadMoreSubscribe = viewModelServerOperations.LoadMoreDone.observeOn(AndroidSchedulers.mainThread())
-            .subscribe({ arrlist ->
+            .subscribe({ newcontentarrlist ->
                 if (!viewModelServerOperations.isloadingmore) return@subscribe
-                if (arrlist.isEmpty())
+                if (newcontentarrlist.isEmpty())
                 {
                     Toast.makeText(
                         applicationContext,
                         "Data don't uploaded", Toast.LENGTH_SHORT
                     ).show()
                 }
+                else
+                {
+                    contentArrList.addAll(newcontentarrlist)
+                }
+                recyclerViewAdapter.removeLoader()
                 Log.v("loadobserv", "recyclecoutn${recyclerViewAdapter.itemCount}")
+                Log.v("loadobserv", Thread.currentThread().name)
                 infiniteScrollListener.loading = false
                 viewModelServerOperations.isloadingmore = false
             })
@@ -201,7 +207,7 @@ class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivit
         {
             Log.v("filem", "s.cachenull")
             cachefile = File.createTempFile(
-                "cachejokesarrlist",
+                "cachejokesnewcontentarrlist",
                 null, applicationContext.cacheDir
             )
         }
