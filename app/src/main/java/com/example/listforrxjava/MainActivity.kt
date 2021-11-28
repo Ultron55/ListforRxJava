@@ -22,7 +22,6 @@ import java.io.*
 class MainActivity : InfiniteScrollListener.OnLoadMoreListener, AppCompatActivity ()  {
 
     var recyclerView : RecyclerView? = null
-    //private val PORTIONCOUNT = 20 // количество контента в порции
     val viewModelServerOperations : ViewModelServerOperations by viewModels()
     lateinit var LoadMoreSubscribe : Disposable
     lateinit var infiniteScrollListener : InfiniteScrollListener //для ловли прокрутки
